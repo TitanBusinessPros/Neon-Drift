@@ -117,7 +117,7 @@
             <div>SPEED: <span id="speed">1.0x</span></div>
         </div>
         <div id="instructions">
-            MOUSE to move • Collect cyan orbs • Avoid enemy ships • 🛡️Shield 🌟Score ⏱️Slowmo
+            MOUSE to move • 🔵Orbs +10 • 🛡️Shield ⭐+50 ⏱️Slowmo ❄️Freeze 🧲Magnet
         </div>
         <div id="startScreen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30;">
             <img src="https://github.com/TitanBusinessPros/SSG-Image/raw/main/Neon%20Drift%20Logo.png" alt="Neon Drift Logo" style="max-width: 400px; width: 70%; margin-bottom: 10px; filter: drop-shadow(0 0 30px #00ffff);">
@@ -188,7 +188,11 @@
                 shield: false,
                 shieldTime: 0,
                 slowmo: false,
-                slowmoTime: 0
+                slowmoTime: 0,
+                freeze: false,
+                freezeTime: 0,
+                magnet: false,
+                magnetTime: 0
             }
         };
 
@@ -231,7 +235,11 @@
                     shield: false,
                     shieldTime: 0,
                     slowmo: false,
-                    slowmoTime: 0
+                    slowmoTime: 0,
+                    freeze: false,
+                    freezeTime: 0,
+                    magnet: false,
+                    magnetTime: 0
                 }
             };
             document.getElementById('gameOver').style.display = 'none';
@@ -270,12 +278,14 @@
         }
 
         function createPowerup() {
-            const types = ['shield', 'slowmo', 'scoreBoost'];
+            const types = ['shield', 'slowmo', 'scoreBoost', 'freeze', 'magnet'];
             const type = types[Math.floor(Math.random() * types.length)];
             const colors = {
                 shield: '#00ff00',
                 slowmo: '#ffff00',
-                scoreBoost: '#ff8800'
+                scoreBoost: '#ff8800',
+                freeze: '#00ddff',
+                magnet: '#ff00ff'
             };
             return {
                 x: Math.random() * canvas.width,
@@ -316,14 +326,37 @@
                 gameState.player.slowmoTime--;
                 if (gameState.player.slowmoTime <= 0) gameState.player.slowmo = false;
             }
+            if (gameState.player.freeze) {
+                gameState.player.freezeTime--;
+                if (gameState.player.freezeTime <= 0) gameState.player.freeze = false;
+            }
+            if (gameState.player.magnet) {
+                gameState.player.magnetTime--;
+                if (gameState.player.magnetTime <= 0) gameState.player.magnet = false;
+            }
 
             if (Math.random() < 0.02) gameState.orbs.push(createOrb());
             if (Math.random() < 0.015) gameState.obstacles.push(createObstacle());
-            if (Math.random() < 0.008) gameState.powerups.push(createPowerup());
+            if (Math.random() < 0.025) gameState.powerups.push(createPowerup());
 
             // Update orbs
             gameState.orbs.forEach((orb, i) => {
-                orb.y += orb.speed * (gameState.player.slowmo ? 0.5 : 1);
+                // Magnet effect - pull orbs towards player
+                if (gameState.player.magnet) {
+                    const dx = gameState.player.x - orb.x;
+                    const dy = gameState.player.y - orb.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const magnetStrength = 0.3;
+                    
+                    if (dist > 0) {
+                        orb.x += (dx / dist) * magnetStrength * 10;
+                        orb.y += (dy / dist) * magnetStrength * 10;
+                    }
+                }
+                
+                if (!gameState.player.freeze) {
+                    orb.y += orb.speed * (gameState.player.slowmo ? 0.5 : 1);
+                }
                 orb.pulse += 0.1;
 
                 const dx = gameState.player.x - orb.x;
@@ -344,7 +377,9 @@
 
             // Update power-ups
             gameState.powerups.forEach((powerup, i) => {
-                powerup.y += powerup.speed * (gameState.player.slowmo ? 0.5 : 1);
+                if (!gameState.player.freeze) {
+                    powerup.y += powerup.speed * (gameState.player.slowmo ? 0.5 : 1);
+                }
                 powerup.pulse += 0.1;
 
                 const dx = gameState.player.x - powerup.x;
@@ -362,6 +397,12 @@
                         gameState.player.slowmoTime = 240; // 4 seconds
                     } else if (powerup.type === 'scoreBoost') {
                         gameState.score += 50;
+                    } else if (powerup.type === 'freeze') {
+                        gameState.player.freeze = true;
+                        gameState.player.freezeTime = 180; // 3 seconds
+                    } else if (powerup.type === 'magnet') {
+                        gameState.player.magnet = true;
+                        gameState.player.magnetTime = 300; // 5 seconds
                     }
                     
                     gameState.powerups.splice(i, 1);
@@ -374,8 +415,10 @@
 
             // Update obstacles
             gameState.obstacles.forEach((obs, i) => {
-                obs.y += obs.speed * (gameState.player.slowmo ? 0.5 : 1);
-                obs.rotation += obs.rotationSpeed;
+                if (!gameState.player.freeze) {
+                    obs.y += obs.speed * (gameState.player.slowmo ? 0.5 : 1);
+                    obs.rotation += obs.rotationSpeed;
+                }
 
                 const dx = gameState.player.x - obs.x;
                 const dy = gameState.player.y - obs.y;
@@ -474,6 +517,8 @@
                 if (powerup.type === 'shield') ctx.fillText('🛡️', powerup.x, powerup.y);
                 else if (powerup.type === 'slowmo') ctx.fillText('⏱️', powerup.x, powerup.y);
                 else if (powerup.type === 'scoreBoost') ctx.fillText('⭐', powerup.x, powerup.y);
+                else if (powerup.type === 'freeze') ctx.fillText('❄️', powerup.x, powerup.y);
+                else if (powerup.type === 'magnet') ctx.fillText('🧲', powerup.x, powerup.y);
                 
                 ctx.shadowBlur = 0;
             });
@@ -512,6 +557,32 @@
                     ctx.beginPath();
                     ctx.arc(0, 0, gameState.player.radius + 15, 0, Math.PI * 2);
                     ctx.stroke();
+                }
+                
+                // Draw magnet field if active
+                if (gameState.player.magnet) {
+                    ctx.strokeStyle = '#ff00ff';
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 25;
+                    ctx.shadowColor = '#ff00ff';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, gameState.player.radius + 20, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                // Draw freeze effect if active
+                if (gameState.player.freeze) {
+                    ctx.strokeStyle = '#00ddff';
+                    ctx.lineWidth = 2;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#00ddff';
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(Math.cos(angle) * 40, Math.sin(angle) * 40);
+                        ctx.stroke();
+                    }
                 }
                 
                 ctx.shadowBlur = 30;
