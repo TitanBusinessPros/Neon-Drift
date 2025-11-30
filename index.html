@@ -20,22 +20,32 @@
             min-height: 100vh;
             font-family: 'Courier New', monospace;
             overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
 
         #gameContainer {
             position: relative;
-            width: 800px;
+            width: 100%;
+            max-width: 800px;
             height: 600px;
             background: linear-gradient(180deg, #0f0520 0%, #1a0a2e 100%);
             border: 3px solid #ff00ff;
             box-shadow: 0 0 40px #ff00ff, inset 0 0 60px rgba(255, 0, 255, 0.1);
             overflow: hidden;
+            touch-action: none;
         }
 
         #canvas {
             display: block;
             width: 100%;
             height: 100%;
+            touch-action: none;
         }
 
         #ui {
@@ -107,6 +117,56 @@
             font-size: 16px;
             text-align: center;
         }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            #gameContainer {
+                height: 100vh;
+                max-height: 100vh;
+                border: none;
+                box-shadow: none;
+            }
+            
+            #ui {
+                font-size: 16px;
+            }
+            
+            #instructions {
+                font-size: 14px;
+                width: 90%;
+            }
+            
+            #gameOver h1 {
+                font-size: 40px;
+            }
+            
+            #gameOver p {
+                font-size: 20px;
+            }
+            
+            #startScreen img {
+                max-width: 300px;
+            }
+            
+            #startScreen h1 {
+                font-size: 36px;
+            }
+        }
+        
+        #touchControl {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+        
+        #touchControl.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -117,8 +177,9 @@
             <div>SPEED: <span id="speed">1.0x</span></div>
         </div>
         <div id="instructions">
-            MOUSE to move • 🔵Orbs +10 • 🛡️Shield ⭐+50 ⏱️Slowmo ❄️Freeze 🧲Magnet
+            TOUCH to move • 🔵Orbs +10 • 🛡️Shield ⭐+50 ⏱️Slowmo ❄️Freeze 🧲Magnet
         </div>
+        <div id="touchControl">TOUCH CONTROLS ACTIVE</div>
         <div id="startScreen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30;">
             <img src="https://github.com/TitanBusinessPros/SSG-Image/raw/main/Neon%20Drift%20Logo.png" alt="Neon Drift Logo" style="max-width: 400px; width: 70%; margin-bottom: 10px; filter: drop-shadow(0 0 30px #00ffff);">
             <h1 style="font-size: 48px; color: #00ffff; text-shadow: 0 0 20px #00ffff; margin-bottom: 20px;">NEON DRIFT</h1>
@@ -134,8 +195,17 @@
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 800;
-        canvas.height = 600;
+        const gameContainer = document.getElementById('gameContainer');
+        const touchControl = document.getElementById('touchControl');
+        
+        // Set canvas size to match container
+        function resizeCanvas() {
+            canvas.width = gameContainer.clientWidth;
+            canvas.height = gameContainer.clientHeight;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
         // Load spaceship images
         const playerShip = new Image();
@@ -196,7 +266,70 @@
             }
         };
 
+        // Touch control variables
+        let isDragging = false;
+        let touchId = null;
+
+        // Touch event handlers
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState.gameOver) return;
+            
+            const touch = e.touches[0];
+            touchId = touch.identifier;
+            
+            const rect = canvas.getBoundingClientRect();
+            gameState.player.targetX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+            gameState.player.targetY = (touch.clientY - rect.top) * (canvas.height / rect.height);
+            
+            isDragging = true;
+            touchControl.classList.add('active');
+            
+            // Start music on first interaction
+            if (!musicStarted) {
+                bgMusic.play().catch(e => console.log('Audio autoplay prevented'));
+                musicStarted = true;
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDragging || gameState.gameOver) return;
+            
+            // Find our touch
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === touchId) {
+                    const touch = e.touches[i];
+                    const rect = canvas.getBoundingClientRect();
+                    gameState.player.targetX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                    gameState.player.targetY = (touch.clientY - rect.top) * (canvas.height / rect.height);
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            // Check if our touch ended
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === touchId) {
+                    isDragging = false;
+                    touchControl.classList.remove('active');
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            isDragging = false;
+            touchControl.classList.remove('active');
+        });
+
+        // Mouse controls (for desktop)
         canvas.addEventListener('mousemove', (e) => {
+            if (gameState.gameOver) return;
+            
             const rect = canvas.getBoundingClientRect();
             gameState.player.targetX = (e.clientX - rect.left) * (canvas.width / rect.width);
             gameState.player.targetY = (e.clientY - rect.top) * (canvas.height / rect.height);
