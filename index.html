@@ -167,10 +167,95 @@
         #touchControl.active {
             display: block;
         }
+        
+        /* Ad Video Screen Styles */
+        #adScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 40;
+            overflow: hidden;
+        }
+        
+        .video-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        #adVideo {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            background: #000;
+        }
+        
+        #countdownTimer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ff00ff;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff00ff;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+            z-index: 41;
+        }
+        
+        #skipButton {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 41;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        #skipButton:hover {
+            background: rgba(0, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
+        <!-- Ad Video Screen -->
+        <div id="adScreen">
+            <div class="video-container">
+                <video id="adVideo" muted playsinline>
+                    <source src="https://github.com/TitanBusinessPros/Zombie-Outbreak-Honolulu/raw/main/Ad-2-Zombie.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div id="countdownTimer">7</div>
+            <button id="skipButton">Skip Ad</button>
+        </div>
+        
         <canvas id="canvas"></canvas>
         <div id="ui">
             <div>SCORE: <span id="score">0</span></div>
@@ -180,11 +265,15 @@
             TOUCH to move • 🔵Orbs +10 • 🛡️Shield ⭐+50 ⏱️Slowmo ❄️Freeze 🧲Magnet
         </div>
         <div id="touchControl">TOUCH CONTROLS ACTIVE</div>
-        <div id="startScreen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30;">
+        
+        <!-- Start Screen -->
+        <div id="startScreen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 30;">
             <img src="https://github.com/TitanBusinessPros/SSG-Image/raw/main/Neon%20Drift%20Logo.png" alt="Neon Drift Logo" style="max-width: 400px; width: 70%; margin-bottom: 10px; filter: drop-shadow(0 0 30px #00ffff);">
             <h1 style="font-size: 48px; color: #00ffff; text-shadow: 0 0 20px #00ffff; margin-bottom: 20px;">NEON DRIFT</h1>
             <button id="startBtn" style="background: linear-gradient(135deg, #ff00ff, #00ffff); border: none; padding: 15px 40px; font-size: 22px; color: #0a0a0f; font-weight: bold; cursor: pointer; text-transform: uppercase; box-shadow: 0 0 20px #ff00ff; transition: all 0.3s;">START GAME</button>
         </div>
+        
+        <!-- Game Over Screen -->
         <div id="gameOver">
             <h1>GAME OVER</h1>
             <p>FINAL SCORE: <span id="finalScore">0</span></p>
@@ -197,6 +286,14 @@
         const ctx = canvas.getContext('2d');
         const gameContainer = document.getElementById('gameContainer');
         const touchControl = document.getElementById('touchControl');
+        
+        // Ad video elements
+        const adScreen = document.getElementById('adScreen');
+        const adVideo = document.getElementById('adVideo');
+        const countdownTimer = document.getElementById('countdownTimer');
+        const skipButton = document.getElementById('skipButton');
+        const startScreen = document.getElementById('startScreen');
+        const videoContainer = document.querySelector('.video-container');
         
         // Set canvas size to match container
         function resizeCanvas() {
@@ -269,6 +366,67 @@
         // Touch control variables
         let isDragging = false;
         let touchId = null;
+
+        // Countdown timer variables
+        let countdownValue = 7;
+        let countdownInterval;
+
+        // Initialize ad video and countdown
+        function initAdVideo() {
+            adScreen.style.display = 'flex';
+            countdownTimer.textContent = countdownValue;
+            
+            // Get video dimensions and adjust container
+            adVideo.addEventListener('loadedmetadata', function() {
+                const videoRatio = adVideo.videoWidth / adVideo.videoHeight;
+                const containerRatio = videoContainer.clientWidth / videoContainer.clientHeight;
+                
+                if (videoRatio > containerRatio) {
+                    // Video is wider than container
+                    adVideo.style.width = '100%';
+                    adVideo.style.height = 'auto';
+                } else {
+                    // Video is taller than container
+                    adVideo.style.width = 'auto';
+                    adVideo.style.height = '100%';
+                }
+            });
+            
+            // Start the ad video
+            adVideo.play().catch(e => {
+                console.log('Video autoplay prevented, trying with user interaction');
+                // If autoplay is blocked, show a play button
+                adVideo.controls = true;
+                skipButton.textContent = 'Play & Skip';
+            });
+            
+            // Start countdown
+            countdownInterval = setInterval(updateCountdown, 1000);
+            
+            // Video ended event
+            adVideo.addEventListener('ended', showStartScreen);
+            
+            // Skip button event
+            skipButton.addEventListener('click', showStartScreen);
+        }
+
+        function updateCountdown() {
+            countdownValue--;
+            countdownTimer.textContent = countdownValue;
+            
+            if (countdownValue <= 0) {
+                clearInterval(countdownInterval);
+                showStartScreen();
+            }
+        }
+
+        function showStartScreen() {
+            clearInterval(countdownInterval);
+            adScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+            adVideo.pause();
+            adVideo.currentTime = 0;
+        }
 
         // Touch event handlers
         canvas.addEventListener('touchstart', (e) => {
@@ -344,7 +502,7 @@
         document.getElementById('restartBtn').addEventListener('click', restart);
         
         document.getElementById('startBtn').addEventListener('click', () => {
-            document.getElementById('startScreen').style.display = 'none';
+            startScreen.style.display = 'none';
             bgMusic.play().catch(e => console.log('Audio play prevented'));
             musicStarted = true;
             gameLoop();
@@ -746,7 +904,8 @@
             }
         }
 
-        // Don't start the game loop automatically - wait for start button
+        // Start the ad video when page loads
+        window.addEventListener('load', initAdVideo);
     </script>
 </body>
 </html>
